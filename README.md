@@ -100,3 +100,7 @@ extension grant itself that access.
 
 No build step, no npm install, no external dependencies — the folder is
 loaded as-is.
+
+## License
+
+[MIT](LICENSE)

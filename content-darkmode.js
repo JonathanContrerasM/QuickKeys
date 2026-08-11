@@ -24,7 +24,7 @@ function ensureStyleInjected() {
 }
 
 function applyDarkMode(enabled) {
-  ensureStyleInjected();
+  if (enabled) ensureStyleInjected();
   document.documentElement.classList.toggle(CLASS_NAME, enabled);
 }
 

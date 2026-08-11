@@ -102,8 +102,11 @@ async function copyActiveTabUrl() {
   });
 }
 
-async function getDisplayWorkArea(windowId) {
-  const win = await api.windows.get(windowId);
+// Takes an already-fetched window object rather than a windowId — the
+// window's left/top/width/height are already available on any Window
+// object callers have on hand, so re-fetching it here would just be a
+// redundant windows.get() round-trip.
+async function getDisplayWorkArea(win) {
   const displays = await api.system.display.getInfo();
   const centerX = (win.left ?? 0) + (win.width ?? 0) / 2;
   const centerY = (win.top ?? 0) + (win.height ?? 0) / 2;
@@ -219,31 +222,75 @@ async function setWindowBounds(windowId, bounds) {
   await applyBoundsWithRetry(windowId, bounds);
 }
 
+// Serializes every read-modify-write of a chrome.storage.session key
+// through a per-key in-memory queue, so triggers that land close together
+// (a merge racing a split, a window closing while the quick switcher is
+// opening, etc.) can't clobber each other's write with a stale read.
+// `mutate` gets the key's current value (or `fallback` if unset) and
+// returns the next value to store, or SESSION_SKIP to leave it untouched;
+// `mutate` may itself be async, so callers can safely thread an awaited
+// side effect (like opening a window) through the same serialization point.
+const SESSION_SKIP = Symbol("session-skip");
+const sessionQueues = new Map();
+function updateSession(key, fallback, mutate) {
+  const queue = sessionQueues.get(key) || Promise.resolve();
+  const result = queue.then(async () => {
+    const stored = await api.storage.session.get(key);
+    const current = key in stored ? stored[key] : fallback;
+    const next = await mutate(current);
+    if (next !== SESSION_SKIP) {
+      await api.storage.session.set({ [key]: next });
+    }
+  });
+  sessionQueues.set(
+    key,
+    result.catch(() => {}),
+  );
+  return result;
+}
+
 async function splitToRegion(regionKey) {
   const tab = await getActiveTab();
   if (!tab) return;
   const originWindowId = tab.windowId;
   const originWindow = await api.windows.get(originWindowId);
-  const workArea = await getDisplayWorkArea(originWindowId);
+  const workArea = await getDisplayWorkArea(originWindow);
   const { newBounds, originBounds } = SPLIT_REGIONS[regionKey](workArea);
 
-  const preSplitOriginBounds = {
-    left: originWindow.left,
-    top: originWindow.top,
-    width: originWindow.width,
-    height: originWindow.height,
+  const originTabs = await api.tabs.query({ windowId: originWindowId });
+  const originWillClose = originTabs.length <= 1;
+
+  const preSplitOrigin = {
+    bounds: {
+      left: originWindow.left,
+      top: originWindow.top,
+      width: originWindow.width,
+      height: originWindow.height,
+    },
+    state: originWindow.state,
   };
 
   const newWindow = await api.windows.create({ tabId: tab.id, ...newBounds });
-  await applyBoundsWithRetry(newWindow.id, newBounds);
 
-  if (originBounds) {
-    await setWindowBounds(originWindowId, originBounds);
+  const resizeTasks = [applyBoundsWithRetry(newWindow.id, newBounds)];
+  if (originBounds && !originWillClose) {
+    resizeTasks.push(setWindowBounds(originWindowId, originBounds));
   }
+  await Promise.all(resizeTasks);
 
-  const { splitPairs = {} } = await api.storage.session.get("splitPairs");
-  splitPairs[newWindow.id] = { originWindowId, originBounds: preSplitOriginBounds };
-  await api.storage.session.set({ splitPairs });
+  if (!originWillClose) {
+    await updateSession("splitPairs", {}, (splitPairs) => {
+      splitPairs[newWindow.id] = { originWindowId, ...preSplitOrigin };
+      return splitPairs;
+    });
+  }
+}
+
+async function discardStalePair(windowId) {
+  await updateSession("splitPairs", {}, (splitPairs) => {
+    delete splitPairs[windowId];
+    return splitPairs;
+  });
 }
 
 async function mergeWindow() {
@@ -253,59 +300,78 @@ async function mergeWindow() {
   const pair = splitPairs[tab.windowId];
   if (!pair) return;
 
+  // Guards against a pair persisted under an older/incompatible schema
+  // (e.g. surviving a mid-flight code update) — rather than crashing on a
+  // malformed shape, just treat it as unrestorable and discard it.
+  if (!pair.bounds) {
+    await discardStalePair(tab.windowId);
+    return;
+  }
+
   try {
     await api.windows.get(pair.originWindowId);
   } catch {
-    delete splitPairs[tab.windowId];
-    await api.storage.session.set({ splitPairs });
+    await discardStalePair(tab.windowId);
     return;
   }
 
   await api.tabs.move(tab.id, { windowId: pair.originWindowId, index: -1 });
   await api.tabs.update(tab.id, { active: true });
-  await setWindowBounds(pair.originWindowId, pair.originBounds);
 
-  delete splitPairs[tab.windowId];
-  await api.storage.session.set({ splitPairs });
+  // A maximized/fullscreen origin's captured left/top/width/height is its
+  // pre-maximize restore geometry, which isn't reliably reproducible (and
+  // isn't what the user actually had) — just restore that state directly
+  // instead of fighting it with bounds.
+  if (pair.state && pair.state !== "normal") {
+    await api.windows.update(pair.originWindowId, { state: pair.state });
+  } else {
+    await setWindowBounds(pair.originWindowId, pair.bounds);
+  }
+
+  await discardStalePair(tab.windowId);
 }
 
 api.windows.onRemoved.addListener(async (windowId) => {
-  const { splitPairs = {} } = await api.storage.session.get("splitPairs");
-  if (splitPairs[windowId]) {
+  await updateSession("splitPairs", {}, (splitPairs) => {
+    if (!(windowId in splitPairs)) return SESSION_SKIP;
     delete splitPairs[windowId];
-    await api.storage.session.set({ splitPairs });
-  }
-  if (quickSwitcherWindowId === windowId) {
-    quickSwitcherWindowId = null;
-  }
+    return splitPairs;
+  });
+
+  await updateSession("quickSwitcherWindowId", null, (currentId) =>
+    currentId === windowId ? null : SESSION_SKIP,
+  );
 });
 
-let quickSwitcherWindowId = null;
-
 async function openQuickSwitcher() {
-  if (quickSwitcherWindowId !== null) {
-    try {
-      await api.windows.update(quickSwitcherWindowId, { focused: true });
-      return;
-    } catch {
-      quickSwitcherWindowId = null;
+  // The whole check-existing/focus-or-create/store-id sequence runs inside
+  // a single queued mutation so it can't interleave with the onRemoved
+  // cleanup above and leave a live window's id un-stored (or vice versa).
+  await updateSession("quickSwitcherWindowId", null, async (existingId) => {
+    if (existingId !== null) {
+      try {
+        await api.windows.update(existingId, { focused: true });
+        return SESSION_SKIP;
+      } catch {
+        // Window no longer exists — fall through and open a new one.
+      }
     }
-  }
 
-  const currentWindow = await api.windows.getLastFocused();
-  const workArea = await getDisplayWorkArea(currentWindow.id);
-  const width = Math.min(560, workArea.width - 40);
-  const height = Math.min(420, workArea.height - 40);
+    const currentWindow = await api.windows.getLastFocused();
+    const workArea = await getDisplayWorkArea(currentWindow);
+    const width = Math.min(560, workArea.width - 40);
+    const height = Math.min(420, workArea.height - 40);
 
-  const switcherWindow = await api.windows.create({
-    url: "switcher.html",
-    type: "popup",
-    width,
-    height,
-    left: Math.round(workArea.left + (workArea.width - width) / 2),
-    top: Math.round(workArea.top + (workArea.height - height) / 3),
+    const switcherWindow = await api.windows.create({
+      url: "switcher.html",
+      type: "popup",
+      width,
+      height,
+      left: Math.round(workArea.left + (workArea.width - width) / 2),
+      top: Math.round(workArea.top + (workArea.height - height) / 3),
+    });
+    return switcherWindow.id;
   });
-  quickSwitcherWindowId = switcherWindow.id;
 }
 
 async function closeTabsToTheRight() {
@@ -343,15 +409,9 @@ async function muteOtherTabs() {
   );
 }
 
-async function enterFocusMode() {
-  const tab = await getActiveTab();
-  if (!tab) return;
-  const tabs = await api.tabs.query({ currentWindow: true });
-  const idsToClose = tabs
-    .filter((t) => t.id !== tab.id && !t.pinned)
-    .map((t) => t.id);
-  if (idsToClose.length) await api.tabs.remove(idsToClose);
-}
+// Focus mode and "close other tabs" both keep the active tab and pinned
+// tabs, and close everything else — same behavior under two shortcut names.
+const enterFocusMode = closeOtherTabs;
 
 async function zoomBy(delta) {
   const tab = await getActiveTab();
