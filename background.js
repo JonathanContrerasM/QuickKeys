@@ -62,6 +62,26 @@ async function cyclePinnedTabs() {
   await api.tabs.update(tabs[nextIndex].id, { active: true });
 }
 
+async function goBack() {
+  const tab = await getActiveTab();
+  if (!tab) return;
+  try {
+    await api.tabs.goBack(tab.id);
+  } catch {
+    // No back history for this tab — nothing to do.
+  }
+}
+
+async function goForward() {
+  const tab = await getActiveTab();
+  if (!tab) return;
+  try {
+    await api.tabs.goForward(tab.id);
+  } catch {
+    // No forward history for this tab — nothing to do.
+  }
+}
+
 async function screenshotVisibleTab() {
   const tab = await getActiveTab();
   if (!tab) return;
@@ -450,6 +470,10 @@ async function handleCommand(command) {
       return switchTab(1);
     case "previous-tab":
       return switchTab(-1);
+    case "go-back":
+      return goBack();
+    case "go-forward":
+      return goForward();
     case "move-tab-right":
       return moveTab(1);
     case "move-tab-left":

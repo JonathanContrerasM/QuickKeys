@@ -57,6 +57,12 @@
     "cycle-pinned-tabs": {
       "description": "Switch to the next pinned tab"
     },
+    "go-back": {
+      "description": "Go back one page in the active tab's history"
+    },
+    "go-forward": {
+      "description": "Go forward one page in the active tab's history"
+    },
     "move-tab-left": {
       "suggested_key": { "default": "Alt+Y" },
       "description": "Move the active tab one position left"

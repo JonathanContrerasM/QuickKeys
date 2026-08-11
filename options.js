@@ -8,6 +8,8 @@ const SHORTCUT_GROUPS = [
       "previous-tab",
       "quick-switcher",
       "cycle-pinned-tabs",
+      "go-back",
+      "go-forward",
       "move-tab-left",
       "move-tab-right",
       "new-tab",

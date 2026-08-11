@@ -20,6 +20,7 @@ extension's options page (right-click the toolbar icon → Options, or click
 
 - Open the quick tab switcher
 - Cycle to the next pinned tab
+- Go back / forward one page in the active tab's history
 - New tab
 - Duplicate active tab
 - Pin/unpin active tab
@@ -58,7 +59,7 @@ key binding.
 ## How it works
 
 - `manifest.json` — MV3 manifest with a `service_worker` background and the
-  `commands` block defining all 33 shortcuts.
+  `commands` block defining all 35 shortcuts.
 - `background.js` — service worker that handles all keyboard commands and
   toolbar-icon clicks, using the `tabs`, `windows`, `sessions`, `storage`,
   `system.display`, `downloads`, and `offscreen` APIs.
