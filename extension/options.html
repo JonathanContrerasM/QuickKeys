@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>QuickKeys Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="icons/icon48.png" alt="" />
+        <div>
+          <h1>QuickKeys</h1>
+          <p>Keyboard shortcuts for tab navigation and dark mode.</p>
+        </div>
+      </header>
+
+      <section class="card">
+        <div class="row">
+          <div>
+            <h2>Dark mode</h2>
+            <p>Applies an inverted-color filter to every site.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="dark-mode-toggle" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Shortcuts</h2>
+        <p class="hint">
+          The four navigation shortcuts are bound by default. Chrome only
+          allows an extension to auto-assign a few keys, so the rest need to
+          be set manually — use the button below.
+        </p>
+        <table id="shortcut-table">
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>Default key</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <button id="open-shortcuts-btn">Open browser shortcut settings</button>
+      </section>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>
