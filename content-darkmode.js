@@ -1,4 +1,4 @@
-const api = globalThis.browser ?? globalThis.chrome;
+const api = globalThis.chrome;
 const CLASS_NAME = "quickkeys-dark-mode";
 const STYLE_ID = "quickkeys-dark-mode-style";
 
