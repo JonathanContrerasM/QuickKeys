@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "QuickKeys",
   "version": "1.0.0",
-  "description": "Assign keyboard shortcuts for tab navigation, tab management, and a global dark mode toggle.",
+  "description": "Keyboard shortcuts for tab navigation, window snapping/split view, a quick switcher, tab cleanup, zoom, and global dark mode.",
   "background": {
     "service_worker": "background.js"
   },
@@ -13,7 +13,7 @@
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     },
-    "default_title": "QuickKeys — click to toggle dark mode"
+    "default_title": "QuickKeys — click to toggle dark mode (see Options for all shortcuts)"
   },
   "options_ui": {
     "page": "options.html",
@@ -25,7 +25,15 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["tabs", "storage", "sessions"],
+  "permissions": [
+    "tabs",
+    "storage",
+    "sessions",
+    "activeTab",
+    "system.display",
+    "downloads",
+    "offscreen"
+  ],
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
@@ -43,31 +51,100 @@
       "suggested_key": { "default": "Alt+A" },
       "description": "Switch to the previous tab"
     },
-    "move-tab-right": {
-      "suggested_key": { "default": "Alt+C" },
-      "description": "Move the active tab one position right"
+    "quick-switcher": {
+      "description": "Open the quick tab switcher"
+    },
+    "cycle-pinned-tabs": {
+      "description": "Switch to the next pinned tab"
     },
     "move-tab-left": {
       "suggested_key": { "default": "Alt+Y" },
       "description": "Move the active tab one position left"
     },
-    "toggle-dark-mode": {
-      "description": "Toggle global dark mode on/off"
-    },
-    "close-tab": {
-      "description": "Close the active tab"
+    "move-tab-right": {
+      "suggested_key": { "default": "Alt+C" },
+      "description": "Move the active tab one position right"
     },
     "new-tab": {
       "description": "Open a new tab"
     },
-    "reopen-closed-tab": {
-      "description": "Reopen the last closed tab"
+    "duplicate-tab": {
+      "description": "Duplicate the active tab"
     },
     "pin-tab": {
       "description": "Pin or unpin the active tab"
     },
-    "duplicate-tab": {
-      "description": "Duplicate the active tab"
+    "close-tab": {
+      "description": "Close the active tab"
+    },
+    "reopen-closed-tab": {
+      "description": "Reopen the last closed tab"
+    },
+    "move-tab-new-window": {
+      "description": "Move the active tab into a new window"
+    },
+    "split-left": {
+      "description": "Split the active tab into a new window snapped to the left half of the screen"
+    },
+    "split-right": {
+      "description": "Split the active tab into a new window snapped to the right half of the screen"
+    },
+    "snap-top-left": {
+      "description": "Split the active tab into a new window snapped to the top-left quadrant"
+    },
+    "snap-top-right": {
+      "description": "Split the active tab into a new window snapped to the top-right quadrant"
+    },
+    "snap-bottom-left": {
+      "description": "Split the active tab into a new window snapped to the bottom-left quadrant"
+    },
+    "snap-bottom-right": {
+      "description": "Split the active tab into a new window snapped to the bottom-right quadrant"
+    },
+    "merge-window": {
+      "description": "Move a split-out tab back into the window it came from"
+    },
+    "close-tabs-right": {
+      "description": "Close all tabs to the right of the active tab"
+    },
+    "close-other-tabs": {
+      "description": "Close every tab except the active tab (pinned tabs are kept)"
+    },
+    "focus-mode": {
+      "description": "Close every unpinned tab except the active tab"
+    },
+    "discard-tab": {
+      "description": "Discard the active tab from memory without closing it"
+    },
+    "mute-tab": {
+      "description": "Mute or unmute the active tab"
+    },
+    "mute-other-tabs": {
+      "description": "Mute every tab except the active tab"
+    },
+    "copy-url": {
+      "description": "Copy the active tab's URL to the clipboard"
+    },
+    "screenshot-tab": {
+      "description": "Save a screenshot of the visible tab"
+    },
+    "zoom-in": {
+      "description": "Zoom in on the active tab"
+    },
+    "zoom-out": {
+      "description": "Zoom out on the active tab"
+    },
+    "zoom-reset": {
+      "description": "Reset zoom on the active tab"
+    },
+    "restore-recent-tabs": {
+      "description": "Reopen the last few closed tabs"
+    },
+    "open-incognito": {
+      "description": "Open the active tab's URL in an incognito window"
+    },
+    "toggle-dark-mode": {
+      "description": "Toggle global dark mode on/off"
     }
   }
 }
