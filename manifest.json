@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "QuickKeys",
   "version": "1.0.0",
-  "description": "Keyboard shortcuts for tab navigation, window snapping/split view, a quick switcher, tab cleanup, zoom, and global dark mode.",
+  "description": "38 keyboard shortcuts for tabs, split view & window snapping, a quick tab switcher, tab cleanup, zoom, and global dark mode.",
+  "homepage_url": "https://github.com/JonathanContrerasM/QuickKeys",
   "background": {
     "service_worker": "background.js"
   },

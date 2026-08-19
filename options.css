@@ -59,6 +59,19 @@ header p {
   font-size: 13px;
 }
 
+.meta {
+  font-size: 12px;
+}
+
+.meta a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.meta a:hover {
+  text-decoration: underline;
+}
+
 .card {
   background: var(--card);
   border: 1px solid var(--border);

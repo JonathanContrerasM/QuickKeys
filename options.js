@@ -151,6 +151,12 @@ function initOpenShortcutsButton() {
   });
 }
 
+function initVersion() {
+  document.getElementById("ext-version").textContent =
+    `v${api.runtime.getManifest().version}`;
+}
+
 renderShortcuts();
 initDarkModeToggle();
 initOpenShortcutsButton();
+initVersion();
