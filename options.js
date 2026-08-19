@@ -20,6 +20,10 @@ const SHORTCUT_GROUPS = [
     ],
   },
   {
+    label: "Search",
+    commands: ["open-result-1", "open-result-2", "open-result-3"],
+  },
+  {
     label: "Window & split view",
     commands: [
       "move-tab-new-window",

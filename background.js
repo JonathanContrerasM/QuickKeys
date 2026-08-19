@@ -82,6 +82,71 @@ async function goForward() {
   }
 }
 
+// DOM knowledge for "open the Nth search result", one entry per engine.
+// `result` matches the title link of an organic result; `exclude` lists the ad
+// and question containers whose links must not be counted. Kept as plain data
+// because injected code cannot close over service-worker scope.
+const SEARCH_ENGINES = [
+  {
+    // `host` is matched against the hostname's dot-separated labels, so one
+    // entry covers every Google ccTLD (google.de, google.co.uk, ...).
+    host: "google",
+    result: "#rso a[href]:has(h3), #search a[href]:has(h3)",
+    exclude: "#tads, #tadsb, #bottomads, [data-text-ad], .related-question-pair",
+  },
+  {
+    host: "duckduckgo",
+    result:
+      'article[data-testid="result"]:not([data-layout="ad"]) a[data-testid="result-title-a"]',
+    exclude: "",
+  },
+  {
+    host: "bing",
+    result: "#b_results > li.b_algo h2 a[href]",
+    exclude: "",
+  },
+];
+
+// Runs in the page, not here — it must stay self-contained.
+function collectSearchResultHrefs(engines) {
+  const labels = location.hostname.split(".");
+  const engine = engines.find((e) => labels.includes(e.host));
+  if (!engine) return [];
+  const adBlocks = engine.exclude
+    ? Array.from(document.querySelectorAll(engine.exclude))
+    : [];
+  const hrefs = [];
+  for (const link of document.querySelectorAll(engine.result)) {
+    if (adBlocks.some((ad) => ad.contains(link))) continue;
+    let url = link.href;
+    if ((link.getAttribute("href") || "").startsWith("/url?")) {
+      // Google occasionally still wraps a result in its own redirector.
+      url = new URLSearchParams(link.search).get("q") || url;
+    }
+    if (!/^https?:/.test(url)) continue;
+    if (url.startsWith(location.origin + "/search")) continue;
+    if (!hrefs.includes(url)) hrefs.push(url);
+  }
+  return hrefs;
+}
+
+async function openSearchResult(index) {
+  const tab = await getActiveTab();
+  if (!tab) return;
+  try {
+    const [injected] = await api.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: collectSearchResultHrefs,
+      args: [SEARCH_ENGINES],
+    });
+    const url = injected?.result?.[index];
+    if (url) await api.tabs.update(tab.id, { url });
+  } catch {
+    // Not a search page we know, or the page forbids injection (chrome://
+    // URLs, the Web Store) — nothing to open.
+  }
+}
+
 async function screenshotVisibleTab() {
   const tab = await getActiveTab();
   if (!tab) return;
@@ -298,6 +363,15 @@ async function splitToRegion(regionKey) {
   }
   await Promise.all(resizeTasks);
 
+  // Repositioning the origin window raises it on some platforms, and its
+  // resize path finishes last — so focus has to be re-asserted on the
+  // popped-out window once every bounds update has settled.
+  try {
+    await api.windows.update(newWindow.id, { focused: true });
+  } catch {
+    // New window already closed — nothing to focus.
+  }
+
   if (!originWillClose) {
     await updateSession("splitPairs", {}, (splitPairs) => {
       splitPairs[newWindow.id] = { originWindowId, ...preSplitOrigin };
@@ -346,6 +420,14 @@ async function mergeWindow() {
     await api.windows.update(pair.originWindowId, { state: pair.state });
   } else {
     await setWindowBounds(pair.originWindowId, pair.bounds);
+  }
+
+  // Same reason as in splitToRegion: the bounds/state update above is what
+  // happens to raise the origin window, so make the focus explicit.
+  try {
+    await api.windows.update(pair.originWindowId, { focused: true });
+  } catch {
+    // Origin window vanished between the move and now.
   }
 
   await discardStalePair(tab.windowId);
@@ -474,6 +556,10 @@ async function handleCommand(command) {
       return goBack();
     case "go-forward":
       return goForward();
+    case "open-result-1":
+    case "open-result-2":
+    case "open-result-3":
+      return openSearchResult(Number(command.slice(-1)) - 1);
     case "move-tab-right":
       return moveTab(1);
     case "move-tab-left":

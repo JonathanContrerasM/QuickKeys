@@ -30,6 +30,7 @@
     "storage",
     "sessions",
     "activeTab",
+    "scripting",
     "system.display",
     "downloads",
     "offscreen"
@@ -62,6 +63,15 @@
     },
     "go-forward": {
       "description": "Go forward one page in the active tab's history"
+    },
+    "open-result-1": {
+      "description": "Open the first search result"
+    },
+    "open-result-2": {
+      "description": "Open the second search result"
+    },
+    "open-result-3": {
+      "description": "Open the third search result"
     },
     "move-tab-left": {
       "suggested_key": { "default": "Alt+Y" },
